@@ -347,7 +347,7 @@ div.tocify {
 
 <h1 class="title toc-ignore">BMS270 SP2019: exploratory data analysis of 16S rRNA amplicon sequencing.</h1>
 <h4 class="author">Jordan Bisanz</h4>
-<h4 class="date">2019-05-15 15:12</h4>
+<h4 class="date">2019-05-20 16:33</h4>
 
 </div>
 
@@ -364,10 +364,15 @@ div.tocify {
 <p>We will be making use of the R programming language which is commonly used across many fields for statistical analysis. To begin, please install and/or update to version of R (3.6.0) by downloading from the following <a href="https://cran.cnr.berkeley.edu/">link</a>. R is commonly accessed through an easy-to-use interface called R studio. This can be downloaded <a href="https://www.rstudio.com/products/rstudio/download/">here</a>. Microbiome-analysis software is frequently updated and is often not back-compatible so <em>please ensure you have the latest version of R.</em> You can always check your version by running the following command in R.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">R.Version</span>()<span class="op">$</span>version.string</code></pre></div>
 <pre><code>## [1] &quot;R version 3.6.0 (2019-04-26)&quot;</code></pre>
-<p>In this tutorial, code that will you run is displayed inside grey boxes, you can either type these out, or copy and paste them into your window to run.</p>
-<p>Make sure you have created a directory you can work in and move to this directory. In my case it will be on my desktop:</p>
-<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">dir.create</span>(<span class="st">&quot;~/Desktop/BMS270_tutorial&quot;</span>)
-<span class="kw">setwd</span>(<span class="st">&quot;~/Desktop/BMS270_tutorial&quot;</span>)</code></pre></div>
+<p>In this tutorial, code that will you run is displayed inside grey boxes, you can either type these out, or copy and paste them into your own Rscript to run.</p>
+<p>Make sure you have created a directory you can work in and move to this directory. In my case it will be on my desktop. Note that the location will be slightly different for UNIX and windows operating systems.</p>
+<div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># On OSX and LINUX:</span>
+<span class="kw">dir.create</span>(<span class="st">&quot;~/Desktop/BMS270_tutorial&quot;</span>)
+<span class="kw">setwd</span>(<span class="st">&quot;~/Desktop/BMS270_tutorial&quot;</span>)
+
+<span class="co"># On Windows</span>
+<span class="kw">dir.create</span>(<span class="st">&quot;C:\Users\YourUserName\Desktop&quot;</span>)
+<span class="kw">setwd</span>(<span class="st">&quot;C:\Users\YourUserName\Desktop&quot;</span>)</code></pre></div>
 </div>
 <div id="installing-libraries" class="section level2">
 <h2><span class="header-section-number">2.2</span> Installing Libraries</h2>
@@ -378,8 +383,8 @@ div.tocify {
 <span class="kw">install.packages</span>(<span class="st">&quot;phangorn&quot;</span>) <span class="co"># useful package to deal with phylogenetic trees</span>
 <span class="kw">install.packages</span>(<span class="st">&quot;BiocManager&quot;</span>) <span class="co"># the installer for Bioconductor packages</span>
 <span class="kw">install.packages</span>(<span class="st">&quot;cluster&quot;</span>) <span class="co"># for cluster analysis</span></code></pre></div>
-<p>When installing packages, make sure that there have not been any errors, if asked to compile, say yes. When installation has been successful, the last line usually reads that the downloaded source packages are in …</p>
-<p>Now we can install the packages we need from Bioconductor using the <code>BiocManager::install()</code> command.</p>
+<p>When installing packages, make sure that there have not been any errors, if asked to compile, say yes. When installation has been successful, the last line usually reads that the downloaded source/binary packages are in …</p>
+<p>Now we can install the packages we need from Bioconductor using the <code>BiocManager::install()</code> command. A quick note, you may be asked if you want to update old packages after every bioconductor installation, it is safe to say no.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r">BiocManager<span class="op">::</span><span class="kw">install</span>(<span class="st">&quot;dada2&quot;</span>) <span class="co"># our primary tool for processing sequencing data</span>
 BiocManager<span class="op">::</span><span class="kw">install</span>(<span class="st">&quot;phyloseq&quot;</span>) <span class="co"># useful microbiome-centric R package</span>
 BiocManager<span class="op">::</span><span class="kw">install</span>(<span class="st">&quot;DECIPHER&quot;</span>) <span class="co"># For nucleotide alignments</span>
@@ -403,7 +408,7 @@ BiocManager<span class="op">::</span><span class="kw">install</span>(<span class
 </div>
 <div id="downloading-sequence-data" class="section level2">
 <h2><span class="header-section-number">2.3</span> Downloading Sequence Data</h2>
-<p>We need a companion database to use with tidyverse which will allow us to identify the taxa found in our samples. For this purpose we will use <a href="https://www.arb-silva.de/documentation/release-132/">SILVA version 132</a> which is an alternative to older commonly used databases such as Green Genes. We can download files directly in R as below using the <code>download.file()</code> function; however, certain windows users may need to manually download these files by visiting this <a href="https://benjjneb.github.io/dada2/training.html">link</a>.</p>
+<p>We need a companion database to use with dada2 which will allow us to identify the taxa found in our samples. For this purpose we will use <a href="https://www.arb-silva.de/documentation/release-132/">SILVA version 132</a> which is an alternative to older commonly used databases such as Green Genes. We can download files directly in R as below using the <code>download.file()</code> function; however, certain windows users may need to manually download these files by visiting this <a href="https://benjjneb.github.io/dada2/training.html">link</a>.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">download.file</span>(
   <span class="dt">url=</span><span class="st">&quot;https://zenodo.org/record/1172783/files/silva_nr_v132_train_set.fa.gz?download=1&quot;</span>,
   <span class="dt">destfile=</span><span class="st">&quot;silva_nr_v132_train_set.fa.gz&quot;</span>
@@ -413,7 +418,7 @@ BiocManager<span class="op">::</span><span class="kw">install</span>(<span class
   <span class="dt">url=</span><span class="st">&quot;https://zenodo.org/record/1172783/files/silva_species_assignment_v132.fa.gz?download=1&quot;</span>,
   <span class="dt">destfile=</span><span class="st">&quot;silva_species_assignment_v132.fa.gz&quot;</span>
 )</code></pre></div>
-<p>We can now download the raw sequencing data in fastq file format which stores both the sequence information and information about the quality of the base call in a single file. Read more about it <a href="https://en.wikipedia.org/wiki/FASTQ_format">here</a>. Usually, a sequence center will provide a directory containing all of your sequencing reads separated on per sample basis, but some times you may need to separate the reads yourself which is called demultiplexing which is supported by a wide variety of reads. Today we will use a common format wherein every sample is represented in its own fastq file which has been compressed using gzip, a commonly used compression algorithm.</p>
+<p>We can now download the raw sequencing data in fastq file format which stores both the sequence information and information about the quality of the base call in a single file. Read more about it <a href="https://en.wikipedia.org/wiki/FASTQ_format">here</a>. Usually, a sequence center will provide a directory containing all of your sequencing reads separated on per sample basis, but some times you may need to separate the reads yourself which is called demultiplexing which is supported by a wide variety of tools. Today we will use a common format wherein every sample is represented in its own fastq file which has been compressed using gzip, a commonly used compression algorithm.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">download.file</span>(
   <span class="dt">url=</span><span class="st">&quot;https://github.com/jbisanz/BMS270_SP2019/raw/master/BMS270_SP2019_reads.tar.gz&quot;</span>,
   <span class="dt">destfile=</span><span class="st">&quot;BMS270_SP2019_reads.tar.gz&quot;</span>
@@ -421,8 +426,7 @@ BiocManager<span class="op">::</span><span class="kw">install</span>(<span class
 <p>Finally we can extract this directory using the built in <code>untar()</code> function as below.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">untar</span>(<span class="st">&quot;BMS270_SP2019_reads.tar.gz&quot;</span>)</code></pre></div>
 <p>Before class it may be worth while getting some practice working with R and a suite of packages we will be using called the tidyverse. You can access a tutorial <a href="https://www.datacamp.com/courses/introduction-to-the-tidyverse">here</a>. It is encouraged, but not manditory.</p>
-<p>You are now ready for class. I look forward to meeting you! Please do not hesitate to email if you have any problems in downloading or installing the necessary items for this tutorial.</p>
-<hr />
+<p><strong>You are now ready for class. I look forward to meeting you! Please do not hesitate to email if you have any problems in downloading or installing the necessary items for this tutorial.</strong></p>
 </div>
 </div>
 

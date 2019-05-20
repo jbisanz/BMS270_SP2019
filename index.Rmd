@@ -1,0 +1,688 @@
+---
+title: "BMS270 SP2019: exploratory data analysis of 16S rRNA amplicon sequencing."
+author: "Jordan Bisanz"
+date: '`r format(Sys.time(), "%Y-%m-%d %H:%M")`'
+output: 
+  html_document:
+    code_folding: show
+    theme: spacelab
+    number_sections: true
+    highlight: monochrome
+    fig_width: 11
+    fig_height: 8.5
+    toc: true
+    toc_float: true
+---
+
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
+```
+
+
+# Background
+
+In this tutorial, we will be carrying out exploratory data analysis of unknown microbiota samples of human origin profiled using single-ended Illumina sequenced V4 amplicons. We will be focusing on how to process raw data, generate useful metrics for comparing microbial communities and visualizaing samples to try to uncover underlying biological connections between them. The samples we will be analyzing today were sequenced and made available through the NCBI Sequence Read Archive and at the completion of the tutorial, you will be able to test if your generated hypotheses are correct.
+
+# Homework before class
+
+*Note: depending on your internet and computer speed, this may take up to half an hour. Please have this completed before class and email if you have any issues.*
+
+## Installing R
+
+We will be making use of the R programming language which is commonly used across many fields for statistical analysis. To begin, please install and/or update to version of R (3.6.0) by downloading from the following [link](https://cran.cnr.berkeley.edu/). R is commonly accessed through an easy-to-use interface called R studio. This can be downloaded [here](https://www.rstudio.com/products/rstudio/download/). Microbiome-analysis software is frequently updated and is often not back-compatible so *please ensure you have the latest version of R.* You can always check your version by running the following command in R.
+
+```{r}
+R.Version()$version.string
+```
+
+In this tutorial, code that will you run is displayed inside grey boxes, you can either type these out, or copy and paste them into your own Rscript to run.
+
+Make sure you have created a directory you can work in and move to this directory. In my case it will be on my desktop. Note that the location will be slightly different for UNIX and windows operating systems.
+
+```{r, eval=F}
+# On OSX and LINUX:
+dir.create("~/Desktop/BMS270_tutorial")
+setwd("~/Desktop/BMS270_tutorial")
+
+# On Windows
+dir.create("C:\Users\YourUserName\Desktop")
+setwd("C:\Users\YourUserName\Desktop")
+```
+
+## Installing Libraries
+
+We will now install the libraries we will need to run our analyses. Generally speaking, there are two ways of installing libraries depending on the repository from which they come: CRAN (comprehensive R archive network) or Bioconductor (specializes in bioinformatics). We will start by obtaining libraries from CRAN, which will include a tool to install Bionconductor libraries. CRAN libraries can be installed using the `install.packages()` function. Note, when coding in many languages including R, anything following a \# is called a comment and is not actually run.
+
+```{r, eval=F}
+install.packages("tidyverse") # this is a suite of tools for data science that greatly extend the function of R
+install.packages("vegan") # useful ecology package
+install.packages("ape") # useful ecology packag
+install.packages("phangorn") # useful package to deal with phylogenetic trees
+install.packages("BiocManager") # the installer for Bioconductor packages
+install.packages("cluster") # for cluster analysis
+```
+
+When installing packages, make sure that there have not been any errors, if asked to compile, say yes. When installation has been successful, the last line usually reads that the downloaded source/binary packages are in ...
+
+Now we can install the packages we need from Bioconductor using the `BiocManager::install()` command. A quick note, you may be asked if you want to update old packages after every bioconductor installation, it is safe to say no.
+
+```{r, eval=F}
+BiocManager::install("dada2") # our primary tool for processing sequencing data
+BiocManager::install("phyloseq") # useful microbiome-centric R package
+BiocManager::install("DECIPHER") # For nucleotide alignments
+BiocManager::install("Biostrings") # For handling FASTA-like files
+BiocManager::install("ggtree") # For visualizing trees
+BiocManager::install("phytools") # For manipulating phylogenetic trees
+BiocManager::install("treeio") # For manipulating phylogenetic trees
+```
+
+Now as a last step, we can load all of these libraries to make sure they have installed properly.
+
+```{r,eval=F}
+library(tidyverse)
+library(vegan)
+library(ape)
+library(dada2)
+library(phyloseq)
+library(DECIPHER)
+library(Biostrings)
+library(ggtree)
+library(cluster)
+library(phangorn)
+```
+
+
+If the package has not been installed, the error message will read: `Error in library(dada2) : there is no package called ‘dada2’`.
+
+
+## Downloading Sequence Data
+
+We need a companion database to use with dada2 which will allow us to identify the taxa found in our samples. For this purpose we will use [SILVA version 132](https://www.arb-silva.de/documentation/release-132/) which is an alternative to older commonly used databases such as Green Genes. We can download files directly in R as below using the `download.file()` function; however, certain windows users may need to manually download these files by visiting this [link](https://benjjneb.github.io/dada2/training.html).
+
+```{r, eval=F}
+download.file(
+  url="https://zenodo.org/record/1172783/files/silva_nr_v132_train_set.fa.gz?download=1",
+  destfile="silva_nr_v132_train_set.fa.gz"
+  )
+
+download.file(
+  url="https://zenodo.org/record/1172783/files/silva_species_assignment_v132.fa.gz?download=1",
+  destfile="silva_species_assignment_v132.fa.gz"
+)
+```
+
+We can now download the raw sequencing data in fastq file format which stores both the sequence information and information about the quality of the base call in a single file. Read more about it [here](https://en.wikipedia.org/wiki/FASTQ_format). Usually, a sequence center will provide a directory containing all of your sequencing reads separated on per sample basis, but some times you may need to separate the reads yourself which is called demultiplexing which is supported by a wide variety of tools. Today we will use a common format wherein every sample is represented in its own fastq file which has been compressed using gzip, a commonly used compression algorithm.
+
+```{r, eval=F}
+download.file(
+  url="https://github.com/jbisanz/BMS270_SP2019/raw/master/BMS270_SP2019_reads.tar.gz",
+  destfile="BMS270_SP2019_reads.tar.gz"
+  )
+```
+
+Finally we can extract this directory using the built in `untar()` function as below.
+
+```{r,eval=F}
+untar("BMS270_SP2019_reads.tar.gz")
+```
+
+
+Before class it may be worth while getting some practice working with R and a suite of packages we will be using called the tidyverse. You can access a tutorial [here](https://www.datacamp.com/courses/introduction-to-the-tidyverse). It is encouraged, but not manditory.
+
+**You are now ready for class. I look forward to meeting you! Please do not hesitate to email if you have any problems in downloading or installing the necessary items for this tutorial.**
+
+```{r, echo=F,eval=F}
+knitr::knit_exit()
+```
+
+***
+
+# Processing Raw Data: FASTQ to Features
+
+## Setting up an Rscript
+
+When working with R, it is always a good idea to create an R script to work in and track the commands you have run. This can be accomplished in Rstudio by selecting File > New File > R script. Save this file (ending in the .R extension) in the directory we created above on your Desktop (BMS270_tutorial). The first thing to do in your R script is to set your working directory using `setwd()` and load the libraries you will need.
+
+```{r, echo=F}
+setwd("~/GitHub/BMS270_SP2019/")
+
+library(tidyverse)
+library(vegan)
+library(ape)
+library(dada2)
+library(phyloseq)
+library(DECIPHER)
+library(Biostrings)
+library(ggtree)
+library(cluster)
+library(phangorn)
+
+```
+
+```{r, eval=F}
+setwd("~/Desktop/BMS217_2019/")
+
+library(tidyverse)
+library(vegan)
+library(ape)
+library(dada2)
+library(phyloseq)
+library(DECIPHER)
+library(Biostrings)
+library(ggtree)
+library(cluster)
+library(phangorn)
+
+```
+
+We can also set up some subdirectories in which we can store our results:
+
+```{r}
+dir.create("figures")
+dir.create("tables")
+dir.create("outputs")
+```
+
+
+Finally, we can check our session using the `sessionInfo()` command which describe our environment and all the package versions we are using. This is very helpful when preparing the methods section for a manuscript!
+
+```{r}
+sessionInfo()
+```
+
+## FASTQ QC
+
+The first step in analyzing high-throughput sequencing data should always be checking the quality of the reads. Sequencing data is commonly analyzed in the FASTQ format which is similar to the commonly used FASTA format with the addition of a line describing the confidence in the basecalls. FASTQ files follow the following repeating pattern of 4 lines:
+
+```
+@M01869:139:000000000-AMK49:1:1101:11347:1451 1:N:0:6
+GGAACAGGAAGAACACGGCGGCGATAACCATGCGCACGCAGGTGATCCACGTGGCGGGAGCGCCGTAGTCGTTCATGAGCAGCTGGGCGCACGTGCCCG
++
+--,-A-69----6C8E7+@++@++@:7EE,C,@+B7@+@+++C,,<CC,C:D,,@+++++8+>C7F++B@:DFF,B9,,:,,8B,,+:+>+@+B,3>>+
+```
+
+The @ line is called the header which denotes the unique identifier for the read. The following line contains the DNA sequence. The 3rd line usually contains just a + sign; however, sometimes the header is repeated. The 4th line encodes the quality information using a scheme wherein individual symbols represent a score out of ~42 which denotes the probability of an error. Most sequencing data generated after ~2013 uses a scoring system called phred33. Find more information on interpreting these scores [here](http://drive5.com/usearch/manual/quality_score.html).
+
+Because we can't easily read these quality scores, it helps to plot the quality. We can use a function called `plotQuality()` to do this. We will sample 3 random fastq files from our dataset to analyze as below.
+
+*Note: the pipe operator (%>%) sends the output of the command to the next line and is common feature in scripting languages. Usually you do not need to do anything special, but for some functions, we must explicitely tell it to expect the data from the previous line by using the `.` as an argument. This is a staple of the tidyverse; however, you could save the individual outputs of each line and manually type it in to the next line. You can highlight a portion of the series of chained command to see the intermediate output for the purposes of problem solving. In this case we can split long functions over multiple lines to make it easier to read and so we can se the individual steps involved.*
+
+
+```{r}
+list.files("reads", full.names = TRUE) %>%
+  sample(3) %>%
+  plotQualityProfile()
+```
+
+In the above plot, the solid green and orange lines denote the mean quality at a given base position. For more information on this function, you can always check the help page for the function using the `?` command. For example: `?plotQualityProfile`.
+
+**QUESTION: What do the dashed orange lines represent in the above plot?**
+
+These sequences look good and a slight dip in sequencing quality can be expected across the read. Usually, sequence quality issues will be consistent across all samples. Although in some cases, such as with heavy primer/adapter dimer contamination, some samples can be more affected than others. For an example of bad sequencing, see [here](https://www.biostars.org/p/354039/).
+
+
+Next we will build a table containing the names of all of our reads. There are multiple types of table-like data structures in R, most commonly: data.frames and matrices, although tibbles (part of the tidyverse) and data.tables (from the data.table) package are also quite common. Each has their strengths and weaknesses. The data.table is the most computationally efficient method; however, it is not as user friendly as the tibble. Because our dataset is quite small, we will be using tibbles for most of this tutorial. We will also create a new set of file names to put the result of quality-filtered reads into by pasting the text "filtered_" in front of the current file location.
+
+```{r}
+metadata<-
+  list.files("reads", full.names=TRUE) %>%
+  tibble(FASTQ=.) %>%
+  mutate(Filtered_FASTQ=paste0("filtered_", FASTQ)) # mutate creates a new column in your table.
+
+metadata # look at the data, note how the data is nicely displayed in your window, this property is unique to tibbles and data.tables.
+```
+
+Now we can run a filtering command to remove low-quality reads and trim off any bad portions. Given that our sequencing data looks quite good, but filtering is still necessary to catch the outliers.
+
+*Note: When dealing with tibbles, data.frames, and data.tables, we can extract any given column by name using the object$Column_name notation.*
+
+```{r}
+dir.create("filtered_reads")
+filterlog<-
+  filterAndTrim(
+    fwd=metadata$FASTQ,
+    filt=metadata$Filtered_FASTQ,
+    maxN=0, # Do not allow N bases, ie those that can't be determined
+    maxEE=2, #allow no more than 2 expected errors in a read, this is calculated based on base quality across the reads
+    truncQ=2, #trim the read at a score of 2 or less.
+    truncLen=140, #trim reads back to be 140bp
+    minLen=140, # remove reads that are less than 140bp after trimming
+    rm.phix=TRUE, #remove phiX DNA
+    multithread=TRUE #!!!!!!!!!SET TO FALSE ON WINDOWS!!!!!!!!!
+  )
+
+```
+
+**QUESTION: What is phiX and why might we remove it?**
+
+The results of the filtering have been sent to variable we called filterlog. We can now examine this to see how many reads were lost. 
+
+*A quick note, you will see in some places we have used the `as.data.frame()` function combined with `row_names_to_column()` and `as_tibble()`. This is being done to convert a matrix to a tibble which is not strictly necessary but makes for easier manipulation using the tidyverse.*
+
+```{r}
+readloss<-
+  filterlog %>%
+  as.data.frame() %>%
+  rownames_to_column("SampleID") %>%
+  as_tibble() %>%
+  mutate(Percent_Reads_Lost=(1-(reads.out/reads.in))*100)
+
+summary(readloss$Percent_Reads_Lost)
+
+```
+
+As you can see in the above summary, we lost betwen 1.038 and 3.326% of reads which is fairly negligible. Generally, it is preferable to have less high quality data, then more junk data. Like many aspects of science:
+
+![](http://benchmarksensory.com.au/wp-content/uploads/2015/11/Quantitative-Sensory-Research-Questionnaire-Content-1030x404.jpg)
+
+## Denosing Sequencing Data
+
+Amplicon sequencing tends to be very noisy. To deal with this, operational taxonomic units (OTUs) have been heavily used for analysis. In this type of analysis, sequences are clustered based on a % identity threshold, often 97%. This has the advantage of negating sequencing errors but causes a lack of resolution. 97% is generally based on the notion that the 16S rRNA of two members of the same species is >=97%; however, this is based on the whole 16S rRNA gene, and not a small fragment as we are commonly analyzing so this logic is not entirely sound.
+
+As a more modern approach, denosing is commonly used to identify sequencing errors and correct them. As for how it works, a simple explanation is that errors are relatively rare and as such can be identified when the error is substitution from a more abundant sequence. For a more complete explanation and alternate approaches see the manuscripts describing Dada2, or any of the other popular denoisign algorithms available:
+
+* dada2 [https://www.nature.com/articles/nmeth.3869](https://www.nature.com/articles/nmeth.3869)
+* deblur [https://msystems.asm.org/content/2/2/e00191-16](https://msystems.asm.org/content/2/2/e00191-16)
+* unoise [https://www.biorxiv.org/content/10.1101/081257v1](https://www.biorxiv.org/content/10.1101/081257v1)
+* Comparison of all three [https://peerj.com/articles/5364/](https://peerj.com/articles/5364/)
+
+```{r}
+error_profiles<-learnErrors(metadata$Filtered_FASTQ, multithread=TRUE) # Remember to set multithread=FALSE on windows
+```
+
+A quick note, we are using a relatively small number of reads to make it feasible to run this tutorial on a laptop computer, but generally an entire sequencing run would be processed with 10-20 million reads or more which may provide a more accurate error estimation. Now that we have learned the error rates, we can denoise our sequencing data.
+
+```{r}
+denoised<-dada(metadata$Filtered_FASTQ, err=error_profiles, multithread = TRUE)
+```
+
+Now that we have denoised our sequencing data, we can calculate the number of unique sequences, which we will call **Sequence Variants (SVs)**, and put them into a table.
+
+```{r}
+SVraw<-makeSequenceTable(denoised)
+```
+
+
+In this table, each sample represents is a row, and each sequence is a column. We can view a small part of the table using the folloing scheme: `table[r,c]`. When accessing data from a table-like object, r will give the row number(s) to extract and c the column(s). If we want the 1st to 3rd rows and columns, we can use 1:3. To see the total number of reads in the table, we can simply use the `sum()` command.
+
+```{r}
+SVraw[1:3,1:3]
+sum(SVraw)
+```
+
+**QUESTION: Is half a million a lot of reads in 2019?**
+
+## Removing Sequencing Artifacts
+
+When dealing with amplicon data, it is incredably important to remove chimeric reads. These sequences are generated through a number of mechanisms but result in a read that is derived from multiple original peices of template DNA. Certain protocols for generating 16S rRNA amplicons, including the methods used to generate this data, are highly prone to chimera formation. For more information on how to prevent their formation, see the manuscript by [Gohl et al. 2016](https://www.nature.com/articles/nbt.3601).
+
+```{r}
+SVnochim<-removeBimeraDenovo(SVraw, method="pooled", verbose=TRUE, multithread=TRUE)
+```
+
+```{r, eval=F, echo=F}
+100*(1-(sum(SVnochim)/sum(SVraw)))
+```
+
+**QUESTION: What percentage of our reads were chimeric? Is this high or low? How could it be improved?**
+
+One final approach to remove artifacts is by removing low abundance and/or sporadic features. Generally, this would be done later in the analysis so as to not influence calculations of diversity, but since we need to have a light computational footprint for our tutorial, we will remove them now. We will require that a SV has to be observed in at least 2 samples.
+
+```{r}
+SVbinary<-SVnochim # create a temporary intermediate table
+SVbinary[SVbinary>0]=1 # convert to a binary representation
+SVbinary<-colSums(SVbinary) # find the number of samples the SV is observed in
+
+SVs_to_keep<-
+  tibble(SV=names(SVbinary), Observed=SVbinary) %>%
+  filter(Observed>=2) %>%
+  pull(SV)
+
+length(SVs_to_keep)
+
+SVtable<-SVnochim[,SVs_to_keep] # we can keep only the columns(SVs) we want based on name
+```
+
+```{r, eval=F, echo=F}
+100*(1-(sum(SVtable)/sum(SVnochim)))
+```
+
+**QUESTION: How many SVs did we remove? What percentage of reads belonged to them?**
+
+## Assigning Taxonomy
+
+If we look at our SVs now, they are merely DNA sequences which tends to not be very helpful. To identify which organism they belong to, we can run any number of taxonomic assignment tools. In this case we will use the built in functions of Dada2 which assigns species level taxonomy based on perfect hits to reference sequences. We will be using the [SILVA 132](https://www.arb-silva.de/documentation/release-132/) databse to assign taxonomy which is one of the largest and most common databases currently available.
+
+```{r}
+taxonomy_raw<-assignTaxonomy(SVtable, "silva_nr_v132_train_set.fa.gz", multithread = TRUE, verbose = TRUE) # set multithread=FALSE on windows
+taxonomy_raw<-addSpecies(taxonomy_raw, "silva_species_assignment_v132.fa.gz", allowMultiple = TRUE, verbose=TRUE) # set multithread=FALSE on windows
+```
+
+```{r}
+taxonomy<-
+  taxonomy_raw %>%
+  as.data.frame() %>%
+  rownames_to_column("Sequence") %>%
+  as_tibble()
+  
+taxonomy
+```
+
+**QUESTION: Why do some SVs not have a species assignment, and why do some have multiple?**
+**QUESTION: Would you expect species assignment to vary across microbiotas and environments?**
+
+To make our dataset easier to read, we can now replace the SV sequences, with an easier to read number. In this case we will use the format SV_#. 
+
+```{r}
+taxonomy<-
+  taxonomy %>%
+  as_tibble() %>%
+  mutate(SV=paste0("SV_", 1:nrow(.))) %>%
+  select(SV, everything())
+
+taxonomy
+```
+
+Now we can replace the labels in our SV table with the simplified names.
+
+```{r}
+colnames(SVtable) <- taxonomy[match(colnames(SVtable), taxonomy$Sequence),]$SV
+```
+
+Finally, and frustratingly, some people like to have samples as rows and features (SVs) as columns, others like the reverse. Different tools have different expections and you must always be aware which orientation is expected. I, unlike the authors of Dada2, prefer samples as columns. The good news is that we can easily transpose the table using `t()` function.
+
+```{r}
+SVtable<-t(SVtable)
+```
+
+## Final QC
+
+As a first check, we should examine the distribution of reads across all of our samples.
+
+
+```{r}
+ReadDepths<-
+  data.frame(Nreads=colSums(SVtable)) %>%
+  rownames_to_column("SampleID") %>%
+  arrange((Nreads))
+
+summary(ReadDepths$Nreads)
+
+ReadDepths
+```
+
+As we see above, we have one sample (Sample_8) that only has 26 reads after all processing. There is not necessarily an accepted cutoff for read depth, but 26 is suspiciously small and most likely represents a failed PCR reaction or loading error. We will remove this sample as it will create issues in downstream analysis.
+
+```{r}
+SVtable<-SVtable[,colnames(SVtable)!="Sample_8.fastq.gz"]
+```
+
+We should also do one last check of our SVs based on their taxonomy. We need to remove features that can't be assigned a Kingdom (artifacts), or belong to Eukaryotes or mitochondria.
+
+**QUESTION: Why would there be mitochondrial 16S rRNA amplicons in our data?**
+
+```{r}
+taxonomy<-
+  taxonomy %>%
+  filter(Kingdom!="Eukaryota") %>%
+  filter(!is.na(Kingdom)) %>%
+  filter(Family!="Mitochondria")
+
+SVtable<-SVtable[taxonomy$SV,]
+```
+
+
+
+# Building a SV phylogenetic tree
+
+There are many types of analysis wherein we want to ask questions about phylogeny which requires a phylogenetic tree. R does at a lot of things really well, but building phylogenetic trees is not one of them, or at least not yet. Today we will use the [workflow recommended](https://f1000research.com/articles/5-1492/v2) by the authors of Dada2 and phyloseq; however, this method does not scale to more than a few hundred SVs. For these instances, alternate tree building methods such as [FastTree](http://www.microbesonline.org/fasttree/) prove to be very effective; however, it can only be run on UNIX operating systems (sorry windows users). Try building the de novo tree as shown below, but if it takes more than 5 min, follow option 2 below.
+
+
+## Align the sequences
+
+```{r, file}
+SVSeqs<-DNAStringSet(taxonomy$Sequence) # Build a FASTA-like object in R
+names(SVSeqs)<-taxonomy$SV
+writeXStringSet(SVSeqs, "outputs/SV.fasta")
+
+alignment <- AlignSeqs(SVSeqs) # create alignment of our 16S
+writeXStringSet(alignment, "outputs/SV.mfa")
+
+alignment
+```
+
+## Build the tree
+
+### Option 1: Build De Novo
+
+```{r}
+phang.align <- phyDat(as(alignment, "matrix"), type="DNA")
+dm <- dist.ml(phang.align)
+treeNJ <- NJ(dm) 
+fit = pml(treeNJ, data=phang.align)
+fitGTR <- update(fit, k=4, inv=0.2)
+fitGTR <- optim.pml(fitGTR, model="GTR", 
+                    optInv=TRUE, 
+                    optGamma=TRUE,
+                    rearrangement = "stochastic",
+                    control = pml.control(trace = 0))
+tree<-fitGTR$tree
+tree<-midpoint(tree)
+
+saveRDS(tree, "outputs/tree.RDS") # save a copy of your tree that you can read back in later
+```
+
+### Option 2: Download tree
+
+```{r,eval=F}
+tree<-readRDS("TREELINKHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+```
+
+## Visualizing the tree
+
+It is always a good idea to double check your tree to make sure all looks as expected. To do this we will use the ggtree package which extends plotting capabilities from the tidyverse to phylogenetic trees. It has one unique feature which is the `%<+%` operator which is used to join additional data for plotting to your tree. 
+
+```{r}
+ggtree(tree) %<+% taxonomy +
+  geom_tippoint(aes(color=Phylum)) +
+  theme(legend.position="right") +
+  ggtitle("Phylogenetic tree of 16S rRNA sequence variants")
+```
+
+**QUESTION: Examine the phylogenetic tree, do the locations and clustering of the phyla look correct to you?**
+
+
+## Cleaning up
+
+It is always a good idea to remove the extra objects you no longer need. In our case we only need our metadata, table of SVs, taxonomy, and tree to go forward. The function below will remove everything but these variables. We will also remove our filtered reads as they will take up storage and not be of any further use.
+
+```{r}
+rm(list=setdiff(ls(), c("taxonomy","SVtable","metadata","tree")))
+unlink("filtered_reads/", recursive=TRUE)
+```
+
+## Plan B
+
+If for some reason you have been unable to generate the analysis from above, you can download a copy of my session which contains everything you will need to proceed.
+
+```{r echo=F, eval=T}
+save.image("outputs/Processed.Rdata")
+```
+
+```{r, eval=F}
+tree<-readRDS("Rdata!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+```
+
+***
+
+# Visualizing communities as a whole
+
+```{r}
+SVsubsampled<-t(SVs) %>% rrarefy(sample=min(colSums(SVs))) %>% t()
+SVsCLR<-apply(log2(SVs+0.5), 2, function(x) x-mean(x))
+
+distances<-list()
+distances$braycurtis<-t(SVsubsampled) %>% vegdist(method="bray")
+distances$unifrac<-UniFrac(phyloseq(otu_table(SVsubsampled, taxa_are_rows = T), tree), weighted=T)
+distances$aitchison<-t(SVs) %>% dist(method="euclidian")
+```
+
+```{r}
+
+pcoas<-lapply(distances, ape::pcoa)
+
+
+lapply(names(pcoas), function(m){
+  pcoas[[m]]$vectors %>%
+    as.data.frame() %>%
+    rownames_to_column("SampleID") %>%
+    mutate(Metric=m) %>%
+    select(Metric, SampleID, Axis.1, Axis.2)
+}) %>%
+  do.call(bind_rows, .) %>%
+  ggplot(aes(x=Axis.1, y=Axis.2, label=SampleID)) +
+  geom_point() +
+  facet_wrap(~Metric, scales="free") +
+  theme_classic()
+```
+
+What do you observe based on these profiles? Do you have an intuition for how many biological groups may be present in this data? Why do these plots look different?
+
+Rather than arbitrary lets do this using a statistical approach testing a range of cluster #s from 2-12.
+
+```{r}
+pam1<-function(x, k){list(cluster = pam(x,k, cluster.only=TRUE))}
+gapstats<-clusGap(pcoas$braycurtis$vectors, FUN=pam1, K.max = 12, B=100)
+
+gapstats<-
+  gapstats$Tab %>%
+  as.data.frame() %>%
+  mutate(Nclusters=1:nrow(.)) %>%
+  select(Nclusters, GapStatistic=gap, SE=SE.sim)
+
+ggplot(gapstats, aes(x=Nclusters, y=GapStatistic, ymin=GapStatistic-SE, ymax=GapStatistic+SE)) +
+  geom_errorbar() +
+  geom_point() +
+  theme_bw()
+```
+
+So clearly there is support for 3 clusters; however, more clusters can be informative. Why might this be? Lets get our cluster assignments and then plot them.
+
+```{r}
+metadata<-
+  data.frame(Cluster=pam(distances$braycurtis, k=3, diss=TRUE, cluster.only = TRUE)) %>% rownames_to_column("SampleID") %>%
+    inner_join(metadata) %>%
+  mutate(Cluster=paste0("Cluster_", Cluster))
+```
+
+```{r}
+pcoas$braycurtis$vectors %>%
+    as.data.frame() %>%
+    rownames_to_column("SampleID") %>%
+  left_join(metadata) %>%
+  ggplot(aes(x=Axis.1, y=Axis.2, label=SampleID, color=Cluster)) +
+  geom_point() +
+  theme_classic() +
+  ggtitle("Clustered UniFrac distances: 3 clusters")
+```
+
+```{r}
+metadata<-
+metadata %>%
+  full_join(
+    full_join(
+    data.frame(Observed_SVs=specnumber(SVsubsampled, MARGIN=2)) %>% as.data.frame() %>% rownames_to_column("SampleID"),
+    data.frame(Shannon_Diversity=vegan::diversity(SVsubsampled, index="shannon", MARGIN=2))%>% rownames_to_column("SampleID")
+    )
+  )
+
+ggplot(metadata, aes(x=Cluster, y=Observed_SVs)) +
+  geom_boxplot() +
+  theme_classic() +
+  ggtitle("Observed SVs by Cluster")
+
+ggplot(metadata, aes(x=Cluster, y=Shannon_Diversity)) +
+  geom_boxplot() +
+  theme_classic() +
+  ggtitle("Shannon Diversity by Cluster")
+
+```
+
+By these two methods, the 3rd cluster is clearly different in terms of its diversity? What does this mean? To help understand which taxa make this different, we can start by plotting the taxa that are present. Looking at what genera is present is a great place to start. We can generate a summary of which taxa are present as below
+
+
+```{r}
+OrderSummary<-
+  apply(SVs,2, function(x) x/sum(x)*100) %>%
+  as.data.frame() %>%
+  rownames_to_column("SVID") %>%
+  gather(-SVID, key="SampleID", value="PercentAbundance") %>%
+  left_join(taxonomy %>% select(SVID, Order)) %>%
+  mutate(Order=as.character(Order)) %>%
+  group_by(SampleID, Order) %>%
+  summarize(PercentAbundance=sum(PercentAbundance))
+
+MostAbundant<-OrderSummary %>% group_by(Order) %>% summarize(mean=mean(PercentAbundance)) %>% arrange((mean)) %>% top_n(mean, n=10) %>% pull(Order)
+
+OrderSummary %>%
+  ungroup() %>%
+  filter(Order %in% MostAbundant) %>%
+  left_join(metadata) %>%
+  ggplot(aes(x=SampleID, y=PercentAbundance, fill=Order)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) +
+  facet_wrap(~Cluster, scales="free_x")
+```
+
+What does this tell you about the relative composition of these communities? Barplots are good at looking at higher level taxonomies, but do not visualize >10 taxa well. For this a heatmap is a better choice, but >50 taxa will not be well visualized.
+
+```{r}
+SVSummary<-
+apply(SVs,2, function(x) x/sum(x)*100) %>%
+  as.data.frame() %>%
+  rownames_to_column("SVID") %>%
+  gather(-SVID, key="SampleID", value="PercentAbundance") %>%
+  left_join(taxonomy) %>%
+  mutate(Taxon=paste(SVID, Phylum, Class, Order, Family, Genus, Species, sep=";")) %>%
+  select(Taxon, SampleID, PercentAbundance)
+
+MostAbundant<-SVSummary %>% group_by(Taxon) %>% summarize(mean=mean(PercentAbundance)) %>% arrange((mean)) %>% top_n(mean, n=50) %>% pull(Taxon)
+
+SVSummary %>%
+  ungroup() %>%
+  filter(Taxon %in% MostAbundant) %>%
+  left_join(metadata) %>%
+  mutate(log10Percent=log10(PercentAbundance+0.01)) %>%
+  ggplot(aes(x=SampleID, y=Taxon, fill=log10Percent)) +
+  geom_tile() +
+  facet_wrap(~Cluster, scales="free_x") +
+  scale_fill_viridis_c() +
+  theme(axis.text.y = element_text(size=7)) +
+  theme(axis.text.x = element_text(angle=45, hjust=1))
+```
+
+Based on the above taxonmic profiles, can you make any intelligent guesses about the source of samples belonging to the various clusters?
+
+# Your assignment
+
+Examine Cluster 1 OR 3 in more detail. A subset of these samples belong to an overweight/obese individual who had to give birth by C-section. Using the strategies described in this tutorial examine the diversity and composition of these samples to identify samples belonging to this individual.
+```{r}
+c1meta<-metadata %>% filter(Cluster=="Cluster_3")
+c1SVs<-SVsubsampled[,c1meta$SampleID]
+
+pc<-
+  UniFrac(phyloseq(otu_table(c1SVs, taxa_are_rows = T), tree), weighted=T) %>%
+#vegdist(t(c1SVs), method = "bray") %>%
+  ape::pcoa()
+
+pc$vectors %>%
+  as.data.frame() %>%
+  rownames_to_column("SampleID") %>%
+  ggplot(aes(x=Axis.1, y=Axis.2, label=SampleID)) +
+  geom_text()
+
+
+```
+
+
