@@ -6,3 +6,6 @@ silva_species_assignment_v132.fa.gz
 .Rhistory
 .Rdata
 index.Rmd
+complete_metadata.xlsx
+index_cache
+index_files

@@ -1,5 +1,5 @@
 ---
-title: "BMS270 SP2019: exploratory data analysis of 16S rRNA amplicon sequencing."
+title: "BMS270 SP2019: 16S rRNA exploratory data analysis."
 author: "Jordan Bisanz"
 date: '`r format(Sys.time(), "%Y-%m-%d %H:%M")`'
 output: 
@@ -16,13 +16,13 @@ output:
 
 
 ```{r include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, warning=F, message=F)
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache = T)
 ```
 
 
 # Background
 
-In this tutorial, we will be carrying out exploratory data analysis of unknown microbiota samples of human origin profiled using single-ended Illumina sequenced V4 amplicons. We will be focusing on how to process raw data, generate useful metrics for comparing microbial communities and visualizaing samples to try to uncover underlying biological connections between them. The samples we will be analyzing today were sequenced and made available through the NCBI Sequence Read Archive and at the completion of the tutorial, you will be able to test if your generated hypotheses are correct.
+In this tutorial, we will be carrying out exploratory data analysis of unknown microbiota samples of human origin profiled using single-ended Illumina sequenced V4 amplicons. We will be focusing on how to process raw data, generate useful metrics for comparing microbial communities and visualizing samples to try to uncover underlying biological connections between them. The samples we will be analyzing today were sequenced and made available through the NCBI Sequence Read Archive and at the completion of the tutorial, you will be able to test if your generated hypotheses are correct.
 
 # Homework before class
 
@@ -52,7 +52,7 @@ setwd("C:\Users\YourUserName\Desktop")
 
 ## Installing Libraries
 
-We will now install the libraries we will need to run our analyses. Generally speaking, there are two ways of installing libraries depending on the repository from which they come: CRAN (comprehensive R archive network) or Bioconductor (specializes in bioinformatics). We will start by obtaining libraries from CRAN, which will include a tool to install Bionconductor libraries. CRAN libraries can be installed using the `install.packages()` function. Note, when coding in many languages including R, anything following a \# is called a comment and is not actually run.
+We will now install the libraries we will need to run our analyses. Generally speaking, there are two ways of installing libraries depending on the repository from which they come: CRAN (comprehensive R archive network) or Bioconductor (specializes in bioinformatics). We will start by obtaining libraries from CRAN, which will include a tool to install Bioconductor libraries. CRAN libraries can be installed using the `install.packages()` function. Note, when coding in many languages including R, anything following a \# is called a comment and is not actually run.
 
 ```{r, eval=F}
 install.packages("tidyverse") # this is a suite of tools for data science that greatly extend the function of R
@@ -65,7 +65,7 @@ install.packages("cluster") # for cluster analysis
 
 When installing packages, make sure that there have not been any errors, if asked to compile, say yes. When installation has been successful, the last line usually reads that the downloaded source/binary packages are in ...
 
-Now we can install the packages we need from Bioconductor using the `BiocManager::install()` command. A quick note, you may be asked if you want to update old packages after every bioconductor installation, it is safe to say no.
+Now we can install the packages we need from Bioconductor using the `BiocManager::install()` command. A quick note, you may be asked if you want to update old packages after every Bioconductor installation, it is safe to say no.
 
 ```{r, eval=F}
 BiocManager::install("dada2") # our primary tool for processing sequencing data
@@ -84,7 +84,7 @@ library(tidyverse)
 library(vegan)
 library(ape)
 library(dada2)
-library(phyloseq)
+library(phyloseq) 
 library(DECIPHER)
 library(Biostrings)
 library(ggtree)
@@ -128,7 +128,7 @@ untar("BMS270_SP2019_reads.tar.gz")
 ```
 
 
-Before class it may be worth while getting some practice working with R and a suite of packages we will be using called the tidyverse. You can access a tutorial [here](https://www.datacamp.com/courses/introduction-to-the-tidyverse). It is encouraged, but not manditory.
+Before class it may be worth while getting some practice working with R and a suite of packages we will be using called the tidyverse. You can access a tutorial [here](https://www.datacamp.com/courses/introduction-to-the-tidyverse). It is encouraged, but not mandatory.
 
 **You are now ready for class. I look forward to meeting you! Please do not hesitate to email if you have any problems in downloading or installing the necessary items for this tutorial.**
 
@@ -176,9 +176,9 @@ library(phangorn)
 
 ```
 
-We can also set up some subdirectories in which we can store our results:
+We can also set up some sub directories in which we can store our results:
 
-```{r}
+```{r, eval=F}
 dir.create("figures")
 dir.create("tables")
 dir.create("outputs")
@@ -204,7 +204,7 @@ GGAACAGGAAGAACACGGCGGCGATAACCATGCGCACGCAGGTGATCCACGTGGCGGGAGCGCCGTAGTCGTTCATGAGC
 
 The @ line is called the header which denotes the unique identifier for the read. The following line contains the DNA sequence. The 3rd line usually contains just a + sign; however, sometimes the header is repeated. The 4th line encodes the quality information using a scheme wherein individual symbols represent a score out of ~42 which denotes the probability of an error. Most sequencing data generated after ~2013 uses a scoring system called phred33. Find more information on interpreting these scores [here](http://drive5.com/usearch/manual/quality_score.html).
 
-Because we can't easily read these quality scores, it helps to plot the quality. We can use a function called `plotQuality()` to do this. We will sample 3 random fastq files from our dataset to analyze as below.
+Because we can't easily read these quality scores, it helps to plot the quality. We can use a function called `plotQuality()` to do this. We will sample 3 random fastq files from our data set to analyze as below.
 
 *Note: the pipe operator (%>%) sends the output of the command to the next line and is common feature in scripting languages. Usually you do not need to do anything special, but for some functions, we must explicitely tell it to expect the data from the previous line by using the `.` as an argument. This is a staple of the tidyverse; however, you could save the individual outputs of each line and manually type it in to the next line. You can highlight a portion of the series of chained command to see the intermediate output for the purposes of problem solving. In this case we can split long functions over multiple lines to make it easier to read and so we can se the individual steps involved.*
 
@@ -272,7 +272,7 @@ summary(readloss$Percent_Reads_Lost)
 
 ```
 
-As you can see in the above summary, we lost betwen 1.038 and 3.326% of reads which is fairly negligible. Generally, it is preferable to have less high quality data, then more junk data. Like many aspects of science:
+As you can see in the above summary, we lost between 1.038 and 3.326% of reads which is fairly negligible. Generally, it is preferable to have less high quality data, then more junk data. Like many aspects of science:
 
 ![](http://benchmarksensory.com.au/wp-content/uploads/2015/11/Quantitative-Sensory-Research-Questionnaire-Content-1030x404.jpg)
 
@@ -280,7 +280,7 @@ As you can see in the above summary, we lost betwen 1.038 and 3.326% of reads wh
 
 Amplicon sequencing tends to be very noisy. To deal with this, operational taxonomic units (OTUs) have been heavily used for analysis. In this type of analysis, sequences are clustered based on a % identity threshold, often 97%. This has the advantage of negating sequencing errors but causes a lack of resolution. 97% is generally based on the notion that the 16S rRNA of two members of the same species is >=97%; however, this is based on the whole 16S rRNA gene, and not a small fragment as we are commonly analyzing so this logic is not entirely sound.
 
-As a more modern approach, denosing is commonly used to identify sequencing errors and correct them. As for how it works, a simple explanation is that errors are relatively rare and as such can be identified when the error is substitution from a more abundant sequence. For a more complete explanation and alternate approaches see the manuscripts describing Dada2, or any of the other popular denoisign algorithms available:
+As a more modern approach, denoising is commonly used to identify sequencing errors and correct them. As for how it works, a simple explanation is that errors are relatively rare and as such can be identified when the error is substitution from a more abundant sequence. For a more complete explanation and alternate approaches see the manuscripts describing Dada2, or any of the other popular denoising algorithms available:
 
 * dada2 [https://www.nature.com/articles/nmeth.3869](https://www.nature.com/articles/nmeth.3869)
 * deblur [https://msystems.asm.org/content/2/2/e00191-16](https://msystems.asm.org/content/2/2/e00191-16)
@@ -304,7 +304,7 @@ SVraw<-makeSequenceTable(denoised)
 ```
 
 
-In this table, each sample represents is a row, and each sequence is a column. We can view a small part of the table using the folloing scheme: `table[r,c]`. When accessing data from a table-like object, r will give the row number(s) to extract and c the column(s). If we want the 1st to 3rd rows and columns, we can use 1:3. To see the total number of reads in the table, we can simply use the `sum()` command.
+In this table, each sample represents is a row, and each sequence is a column. We can view a small part of the table using the following scheme: `table[r,c]`. When accessing data from a table-like object, r will give the row number(s) to extract and c the column(s). If we want the 1st to 3rd rows and columns, we can use 1:3. To see the total number of reads in the table, we can simply use the `sum()` command.
 
 ```{r}
 SVraw[1:3,1:3]
@@ -315,7 +315,7 @@ sum(SVraw)
 
 ## Removing Sequencing Artifacts
 
-When dealing with amplicon data, it is incredably important to remove chimeric reads. These sequences are generated through a number of mechanisms but result in a read that is derived from multiple original peices of template DNA. Certain protocols for generating 16S rRNA amplicons, including the methods used to generate this data, are highly prone to chimera formation. For more information on how to prevent their formation, see the manuscript by [Gohl et al. 2016](https://www.nature.com/articles/nbt.3601).
+When dealing with amplicon data, it is incredibly important to remove chimeric reads. These sequences are generated through a number of mechanisms but result in a read that is derived from multiple original pieces of template DNA. Certain protocols for generating 16S rRNA amplicons, including the methods used to generate this data, are highly prone to chimera formation. For more information on how to prevent their formation, see the manuscript by [Gohl et al. 2016](https://www.nature.com/articles/nbt.3601).
 
 ```{r}
 SVnochim<-removeBimeraDenovo(SVraw, method="pooled", verbose=TRUE, multithread=TRUE)
@@ -352,7 +352,7 @@ SVtable<-SVnochim[,SVs_to_keep] # we can keep only the columns(SVs) we want base
 
 ## Assigning Taxonomy
 
-If we look at our SVs now, they are merely DNA sequences which tends to not be very helpful. To identify which organism they belong to, we can run any number of taxonomic assignment tools. In this case we will use the built in functions of Dada2 which assigns species level taxonomy based on perfect hits to reference sequences. We will be using the [SILVA 132](https://www.arb-silva.de/documentation/release-132/) databse to assign taxonomy which is one of the largest and most common databases currently available.
+If we look at our SVs now, they are merely DNA sequences which tends to not be very helpful. To identify which organism they belong to, we can run any number of taxonomic assignment tools. In this case we will use the built in functions of Dada2 which assigns species level taxonomy based on perfect hits to reference sequences. We will be using the [SILVA 132](https://www.arb-silva.de/documentation/release-132/) database to assign taxonomy which is one of the largest and most common databases currently available.
 
 ```{r}
 taxonomy_raw<-assignTaxonomy(SVtable, "silva_nr_v132_train_set.fa.gz", multithread = TRUE, verbose = TRUE) # set multithread=FALSE on windows
@@ -390,7 +390,7 @@ Now we can replace the labels in our SV table with the simplified names.
 colnames(SVtable) <- taxonomy[match(colnames(SVtable), taxonomy$Sequence),]$SV
 ```
 
-Finally, and frustratingly, some people like to have samples as rows and features (SVs) as columns, others like the reverse. Different tools have different expections and you must always be aware which orientation is expected. I, unlike the authors of Dada2, prefer samples as columns. The good news is that we can easily transpose the table using `t()` function.
+Finally, and frustratingly, some people like to have samples as rows and features (SVs) as columns, others like the reverse. Different tools have different expectations and you must always be aware which orientation is expected. I, unlike the authors of Dada2, prefer samples as columns. The good news is that we can easily transpose the table using `t()` function.
 
 ```{r}
 SVtable<-t(SVtable)
@@ -480,6 +480,10 @@ download.file("https://github.com/jbisanz/BMS270_SP2019/raw/master/outputs/tree.
 tree<-readRDS("outputs/tree.RDS")
 ```
 
+```{r, eval=T, echo=F}
+tree<-readRDS("outputs/tree.RDS")
+```
+
 ## Visualizing the tree
 
 It is always a good idea to double check your tree to make sure all looks as expected. To do this we will use the ggtree package which extends plotting capabilities from the tidyverse to phylogenetic trees. It has one unique feature which is the `%<+%` operator which is used to join additional data for plotting to your tree. 
@@ -507,7 +511,7 @@ unlink("filtered_reads/", recursive=TRUE)
 
 If for some reason you have been unable to generate the analysis from above, you can download a copy of my session which contains everything you will need to proceed.
 
-```{r echo=F, eval=T}
+```{r echo=F, eval=F}
 save.image("outputs/Processed.Rdata")
 ```
 
@@ -526,7 +530,7 @@ As discussed in your previous metagenomics tutorial, ordination approaches are c
 
 * [Bray Curtis](https://en.wikipedia.org/wiki/Bray%E2%80%93Curtis_dissimilarity) Considers the abundances of every SV.
 * [Weighted UniFrac](https://en.wikipedia.org/wiki/UniFrac) Considers the abundance of every SV but also the phylogenetic relationship between them.
-* [Aitchinson distance](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5695134/)  A newer method which considers that data is compositional and applys a centered log ratio transformation to account for this. Then standard Euclidian distance can be calculated. 
+* [Aitchinson distance](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5695134/)  A newer method which considers that data is compositional and applies a centered log ratio transformation to account for this. Then standard Euclidean distance can be calculated. 
 
 For the Bray Curtis and UniFrac data, 
 
@@ -542,7 +546,7 @@ distances$aitchison<-t(SVtable_CLR) %>% dist(method="euclidian")
 distances$unifrac
 ```
 
-As seen above, we now have all distance measurements between every set of samples. We can now ordinate htem using pcoa. Because we have stored our distance matrices in a list, we can use the `lapply()` function to do the same function over all of them.
+As seen above, we now have all distance measurements between every set of samples. We can now ordinate them using pcoa. Because we have stored our distance matrices in a list, we can use the `lapply()` function to do the same function over all of them.
 
 ```{r}
 pcoas<-lapply(distances, ape::pcoa)
@@ -588,7 +592,7 @@ It would appear that there are discrete groups, irrespective of distance metric 
 
 ```{r}
 do_pam<-function(distmat, Nclusters){list(cluster = pam(distmat,Nclusters, cluster.only=TRUE))}
-gapstats<-clusGap(pcoas$aitchison$vectors, FUN=pam1, K.max = 13, B=100) #maximum of 13 clusters (ie 2 per cluster)
+gapstats<-clusGap(pcoas$aitchison$vectors, FUN=do_pam, K.max = 13, B=100) #maximum of 13 clusters (ie 2 per cluster)
 
 gapstats<-
   gapstats$Tab %>%
@@ -665,7 +669,7 @@ ggsave("figures/Shannon.pdf", height=4, width=4, device="pdf", useDingbats=F)
 
 ## Taxonomic Barplot
 
-A common way to look at the composition of samples is through a stacked barplot. This generally involves calculating the percent abundances of higher level taxonomic assignments before plotting. We will do that below.
+A common way to look at the composition of samples is through a stacked bar plot. This generally involves calculating the percent abundances of higher level taxonomic assignments before plotting. We will do that below.
 
 ```{r}
 SummedTaxa<-
@@ -695,7 +699,7 @@ ggsave("figures/Phylum_barplots.pdf", height=4, width=7)
 
 ## Heatmap
 
-When many features are going to be plotted, heatmaps can be a useful tool to aid in visualization, but any more than >50 taxa get too difficult to read. As such we will select the top 50 taxa to plot.
+When many features are going to be plotted, heat maps can be a useful tool to aid in visualization, but any more than >50 taxa get too difficult to read. As such we will select the top 50 taxa to plot.
 
 
 ```{r}
@@ -712,7 +716,6 @@ SummedTaxa<-
 
 MostAbundant<-SummedTaxa %>% group_by(SV_label) %>% summarize(mean=mean(Abundance)) %>% top_n(mean, n=50) %>% pull(SV_label)
 
-
 SummedTaxa %>%
   filter(SV_label %in% MostAbundant) %>%
   mutate(log10Abundance=log10(Abundance+0.01)) %>%
@@ -726,16 +729,35 @@ SummedTaxa %>%
   theme(axis.text.y = element_text(size=7)) +
   theme(axis.text.x = element_text(angle=45, hjust=1)) 
 
-ggsave("figures/SV_heatmap.pdf", height = 5, width=7, device="pdf", useDingbats=F)
+ggsave("figures/SV_heatmap.pdf", height = 7, width=12, device="pdf", useDingbats=F)
 ```
 
 **QUESTION: What does this plot tell you about the taxonomic composition of these samples? What type of human samples do you think each of these clusters represents?**
 
 # Your Assignment
 
-Your task is now to examine either cluster 1 OR cluster 3 in more detail. A set of samples within each of these clusters belong to a pregnant obese individual who gave birth by cesearean section. Using the methods we have covered thus far.
+Your task is now to examine either cluster 1, 2, or cluster 3 in more detail. These samples represent multiple sampling of the same individuals over time and one of these individuals was an obese pregnant women who gave birth by c-section, and healthy pregnant women who gives birth conventionally, and a undernourished women who gives birth conventionally. Using the methods we have covered thus far explore your cluster of choice, generate your hypothesis as to an aspect of the connection between the samples and prepare at least one figure to provide supporting evidence.
+
+To get you started, you can use the following method to create a version of your table restricted to one cluster:
 
 ```{r}
-
+cluster2_metadata<-clustered_metadata %>% filter(Cluster=="Cluster_2")
+cluster2_SVtable<-SVtable_CLR[,cluster2_metadata$SampleID]
 ```
 
+When you are done, share your findings with me and I will provide the key to the identities of the samples. 
+
+***
+
+
+```{r, echo=F, eval=F}
+#CLUSTER 1 is fecal, 2 is oral, 3 is vaginal
+ap<-dist(t(cluster1_SVtable), method="euclidian") %>%
+  pcoa()
+
+ap$vectors %>%
+  as.data.frame() %>%
+  rownames_to_column("SampleID") %>%
+  ggplot(aes(x=Axis.1, y=Axis.2, label=SampleID)) +
+  geom_text()
+```
