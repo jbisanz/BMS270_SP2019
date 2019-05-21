@@ -456,7 +456,7 @@ alignment
 
 ### Option 1: Build De Novo
 
-```{r}
+```{r,eval=F}
 phang.align <- phyDat(as(alignment, "matrix"), type="DNA")
 dm <- dist.ml(phang.align)
 treeNJ <- NJ(dm) 
@@ -476,7 +476,8 @@ saveRDS(tree, "outputs/tree.RDS") # save a copy of your tree that you can read b
 ### Option 2: Download tree
 
 ```{r,eval=F}
-tree<-readRDS("TREELINKHERE!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+download.file("https://github.com/jbisanz/BMS270_SP2019/raw/master/outputs/tree.RDS", "outputs/tree.RDS")
+tree<-readRDS("outputs/tree.RDS")
 ```
 
 ## Visualizing the tree
@@ -511,21 +512,24 @@ save.image("outputs/Processed.Rdata")
 ```
 
 ```{r, eval=F}
-tree<-readRDS("Rdata!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+download.file("https://github.com/jbisanz/BMS270_SP2019/raw/master/outputs/Processed.Rdata", "outputs/Processed.Rdata")
+load("outputs/Processed.Rdata")
 ```
 
 ***
 
-# Visualizing communities as a whole
+
+
+# Visualizing Community Composition
 
 ```{r}
-SVsubsampled<-t(SVs) %>% rrarefy(sample=min(colSums(SVs))) %>% t()
-SVsCLR<-apply(log2(SVs+0.5), 2, function(x) x-mean(x))
+SVtable_subsampled<-t(SVtable) %>% rrarefy(sample=min(colSums(SVtable))) %>% t()
+SVtable_CLR<-apply(log2(SVtable+0.5), 2, function(x) x-mean(x))
 
 distances<-list()
-distances$braycurtis<-t(SVsubsampled) %>% vegdist(method="bray")
-distances$unifrac<-UniFrac(phyloseq(otu_table(SVsubsampled, taxa_are_rows = T), tree), weighted=T)
-distances$aitchison<-t(SVs) %>% dist(method="euclidian")
+distances$braycurtis<-t(SVtable_subsampled) %>% vegdist(method="bray")
+distances$unifrac<-UniFrac(phyloseq(otu_table(SVtable_subsampled, taxa_are_rows = T), tree), weighted=TRUE)
+distances$aitchison<-t(SVtable_CLR) %>% dist(method="euclidian")
 ```
 
 ```{r}
