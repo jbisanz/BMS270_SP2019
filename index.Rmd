@@ -1,5 +1,5 @@
 ---
-title: "BMS270 SP2019: 16S rRNA exploratory data analysis."
+title: "BMS270 SP2019: 16S rRNA exploratory data analysis"
 author: "Jordan Bisanz"
 date: '`r format(Sys.time(), "%Y-%m-%d %H:%M")`'
 output: 
@@ -233,7 +233,7 @@ metadata<-
 metadata # look at the data, note how the data is nicely displayed in your window, this property is unique to tibbles and data.tables.
 ```
 
-Now we can run a filtering command to remove low-quality reads and trim off any bad portions. Given that our sequencing data looks quite good, but filtering is still necessary to catch the outliers.
+Now we can run a filtering command to remove low-quality reads and trim off any bad portions. Our sequencing data looks quite good, but filtering is still necessary to catch the outliers.
 
 *Note: When dealing with tibbles, data.frames, and data.tables, we can extract any given column by name using the object$Column_name notation.*
 
@@ -272,9 +272,7 @@ summary(readloss$Percent_Reads_Lost)
 
 ```
 
-As you can see in the above summary, we lost between 1.038 and 3.326% of reads which is fairly negligible. Generally, it is preferable to have less high quality data, then more junk data. Like many aspects of science:
-
-![](http://benchmarksensory.com.au/wp-content/uploads/2015/11/Quantitative-Sensory-Research-Questionnaire-Content-1030x404.jpg)
+As you can see in the above summary, we lost between 1.038 and 3.326% of reads which is fairly negligible. Generally, it is preferable to have less high quality data, then more junk data. Like many aspects of data science Garbage In = Garbage Out.
 
 ## Denosing Sequencing Data
 
@@ -311,7 +309,7 @@ SVraw[1:3,1:3]
 sum(SVraw)
 ```
 
-**QUESTION: Is half a million a lot of reads in 2019?**
+**QUESTION: Is half a million a lot of reads in 2019 and is this number important? How many might you expect if you were to send samples for sequencing now?**
 
 ## Removing Sequencing Artifacts
 
@@ -370,6 +368,7 @@ taxonomy
 ```
 
 **QUESTION: Why do some SVs not have a species assignment, and why do some have multiple?**
+
 **QUESTION: Would you expect species assignment to vary across microbiotas and environments?**
 
 To make our dataset easier to read, we can now replace the SV sequences, with an easier to read number. In this case we will use the format SV_#. 
@@ -695,6 +694,7 @@ ggsave("figures/Phylum_barplots.pdf", height=4, width=7)
 ```
 
 **QUESTION: What does this tell you about the taxonomic composition of these samples?**
+
 **QUESTION: What happens if you make this plot as genus level instead of phylum?**
 
 ## Heatmap
@@ -734,9 +734,11 @@ ggsave("figures/SV_heatmap.pdf", height = 7, width=12, device="pdf", useDingbats
 
 **QUESTION: What does this plot tell you about the taxonomic composition of these samples? What type of human samples do you think each of these clusters represents?**
 
+**QUESTION: Does the taxonomic composition of these samples give you any indication of the geographic origin or diet of these individuals?**
+
 # Your Assignment
 
-Your task is now to examine either cluster 1, 2, or cluster 3 in more detail. These samples represent multiple sampling of the same individuals over time and one of these individuals was an obese pregnant women who gave birth by c-section, and healthy pregnant women who gives birth conventionally, and a undernourished women who gives birth conventionally. Using the methods we have covered thus far explore your cluster of choice, generate your hypothesis as to an aspect of the connection between the samples and prepare at least one figure to provide supporting evidence.
+Your task is now to examine either cluster 1, 2, or cluster 3 in more detail. These samples represent multiple sampling of the same individuals over time: an obese pregnant women who gave birth by c-section, a healthy pregnant women who gives birth conventionally, and a undernourished women who gives birth conventionally. Using the methods we have covered thus far explore your cluster of choice, generate your hypothesis as to an aspect of the connection between the samples and prepare at least one figure to provide supporting evidence.
 
 To get you started, you can use the following method to create a version of your table restricted to one cluster:
 
@@ -748,7 +750,6 @@ cluster2_SVtable<-SVtable_CLR[,cluster2_metadata$SampleID]
 When you are done, share your findings with me and I will provide the key to the identities of the samples. 
 
 ***
-
 
 ```{r, echo=F, eval=F}
 #CLUSTER 1 is fecal, 2 is oral, 3 is vaginal
