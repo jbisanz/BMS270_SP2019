@@ -161,7 +161,7 @@ library(phangorn)
 ```
 
 ```{r, eval=F}
-setwd("~/Desktop/BMS217_2019/")
+setwd("~/Desktop/BMS270_tutorial")
 
 library(tidyverse)
 library(vegan)
